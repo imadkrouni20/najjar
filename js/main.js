@@ -198,13 +198,10 @@ function renderGallery(){
   });
 }
 
-function renderThumb(container, p){
+/* FIX6 */ function renderThumb(container, p){
   const w = container.clientWidth || 200, h = 110;
-  const r = new THREE.WebGLRenderer({ antialias:true, alpha:true });
+  const r = new THREE.WebGLRenderer({ antialias:true, alpha:true, preserveDrawingBuffer:true });
   r.setSize(w, h); r.setPixelRatio(1);
-  container.appendChild(r.domElement);
-  thumbRenderers.push(r);
-
   const sc = new THREE.Scene();
   sc.add(new THREE.HemisphereLight(0xffffff, 0x333344, 1.0));
   const dl = new THREE.DirectionalLight(0xffffff, 1.2);
@@ -215,17 +212,18 @@ function renderThumb(container, p){
   const size = box.getSize(new THREE.Vector3()).length();
   const center = box.getCenter(new THREE.Vector3());
   const c = new THREE.PerspectiveCamera(45, w/h, 0.1, 100);
-  let t = Math.random()*Math.PI*2;
-
-  (function loop(){
-    if(!container.isConnected || mode !== 'gallery') return;
-    t += 0.006;
-    c.position.set(center.x+Math.cos(t)*size*0.9, center.y+size*0.55, center.z+Math.sin(t)*size*1.05);
-    c.lookAt(center);
-    try{ r.render(sc, c); }catch(e){ return; }
-    const id = requestAnimationFrame(loop);
-    thumbLoops.push(id);
-  })();
+  c.position.set(center.x+size*0.9, center.y+size*0.55, center.z+size*1.05);
+  c.lookAt(center);
+  r.render(sc, c);
+  // استخرج الصورة كـ Data URL ثم دمّر السياق فورًا
+  const dataUrl = r.domElement.toDataURL('image/png');
+  r.dispose();
+  r.forceContextLoss();
+  // اعرض الصورة بدل canvas
+  const img = document.createElement('img');
+  img.src = dataUrl;
+  img.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block';
+  container.appendChild(img);
 }
 
 /* ============ Preview bar ============ */
