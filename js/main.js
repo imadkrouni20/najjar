@@ -50,6 +50,25 @@ const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
 let selected = null;
 
+/* FIX3-dbl */
+let _lastTap = 0, _lastX = 0, _lastY = 0;
+renderer.domElement.addEventListener('pointerdown', e => {
+  const now = Date.now();
+  const t = e.touches ? e.touches[0] : e;
+  const dist = Math.hypot(t.clientX - _lastX, t.clientY - _lastY);
+  if (now - _lastTap < 320 && dist < 30) {
+    // ضغطتان سريعتان → اختيار العنصر تحت الإصبع + فتح اللوحة
+    _lastTap = 0;
+    if (gizmo.isDragging()) return;
+    setTimeout(() => {
+      pick(t.clientX, t.clientY);
+      if (selected) { sideEl.classList.add("open"); }
+    }, 10);
+    return;
+  }
+  _lastTap = now; _lastX = t.clientX; _lastY = t.clientY;
+}, { passive:true });
+
 renderer.domElement.addEventListener('pointerdown', e => {
   if(gizmo.isDragging()) return;
   const startX = e.clientX, startY = e.clientY;
@@ -76,10 +95,13 @@ function pick(x,y){
   select(obj);
 }
 
+/* FIX3 */ function closeSide(){ sideEl.classList.remove("open"); }
+
 function select(obj){
   selected = obj;
   gizmo.attach(obj);
   renderProps(obj);
+  if(!obj) closeSide();
 }
 
 let mode = 'gallery';
