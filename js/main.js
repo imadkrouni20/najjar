@@ -4,16 +4,26 @@ import { BUILDERS, LABELS } from './models.js';
 import { Gizmo } from './gizmo.js';
 import { getMaterial } from './materials.js';
 
-/* ---------- Renderer ---------- */
+/* ============ Renderer ============ */
 const app = document.getElementById('app');
-const renderer = new THREE.WebGLRenderer({ antialias:true });
-renderer.setPixelRatio(Math.min(2, devicePixelRatio));
+const renderer = new THREE.WebGLRenderer({ antialias:true, powerPreference:'high-performance' });
+renderer.setPixelRatio(Math.min(1.5, devicePixelRatio));
 renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 app.appendChild(renderer.domElement);
 
-/* ---------- Scene ---------- */
+/* معالجة فقدان السياق (يمنع الشاشة البيضاء) */
+renderer.domElement.addEventListener('webglcontextlost', e => {
+  e.preventDefault();
+  console.warn('WebGL context lost');
+}, false);
+renderer.domElement.addEventListener('webglcontextrestored', () => {
+  console.warn('WebGL context restored');
+  renderer.setSize(innerWidth, innerHeight);
+}, false);
+
+/* ============ Scene ============ */
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x0e1116);
 scene.fog = new THREE.Fog(0x0e1116, 10, 30);
@@ -29,7 +39,7 @@ controls.maxPolarAngle = Math.PI/2 - 0.02;
 controls.target.set(0, 0.9, 0);
 controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };
 
-/* ---------- Lights ---------- */
+/* ============ Lights ============ */
 scene.add(new THREE.HemisphereLight(0xffffff, 0x223344, 0.85));
 const key = new THREE.DirectionalLight(0xffffff, 1.1);
 key.position.set(3,5,4); key.castShadow = true;
@@ -40,25 +50,25 @@ scene.add(key);
 const fill = new THREE.DirectionalLight(0x88aaff, 0.35);
 fill.position.set(-4,2,-3); scene.add(fill);
 
-/* ---------- Grid ---------- */
+/* ============ Grid ============ */
 const grid = new THREE.GridHelper(20, 40, 0x2b3240, 0x1c2330);
 grid.position.y = 0.001; scene.add(grid);
 
-/* ---------- Product root ---------- */
+/* ============ Product root ============ */
 const productRoot = new THREE.Group();
 scene.add(productRoot);
 
-/* ---------- Gizmo ---------- */
+/* ============ Gizmo ============ */
 const gizmo = new Gizmo(scene, camera, renderer.domElement, ()=>{});
 
-/* ---------- DOM ---------- */
+/* ============ DOM ============ */
 const galleryEl = document.getElementById('gallery');
 const dockEl = document.getElementById('dock');
 const pvbarEl = document.getElementById('pvbar');
 const sideEl = document.getElementById('side');
 const propsEl = document.getElementById('props');
 
-/* ---------- State ---------- */
+/* ============ State ============ */
 const saved = JSON.parse(localStorage.getItem('najjar_products') || '[]');
 const products = saved.length ? saved : seedProducts();
 let activeProduct = null;
@@ -78,7 +88,24 @@ function seedProducts(){
   ];
 }
 
-/* ---------- Modes ---------- */
+/* ============ Thumbnail manager ============ */
+const thumbRenderers = [];        // كل المصغرات النشطة
+const thumbLoops = [];            // معرفات requestAnimationFrame
+
+function stopAllThumbs(){
+  thumbLoops.forEach(id => cancelAnimationFrame(id));
+  thumbLoops.length = 0;
+  thumbRenderers.forEach(r => {
+    try{
+      r.dispose();
+      r.forceContextLoss();
+      r.domElement.remove();
+    }catch(e){}
+  });
+  thumbRenderers.length = 0;
+}
+
+/* ============ Modes ============ */
 document.querySelectorAll('.modes button').forEach(b=>{
   b.onclick = ()=>{
     document.querySelectorAll('.modes button').forEach(x=>x.classList.remove('on'));
@@ -88,20 +115,42 @@ document.querySelectorAll('.modes button').forEach(b=>{
 });
 
 function setMode(m){
+  const prev = mode;
   mode = m;
   galleryEl.classList.toggle('hide', m!=='gallery');
   dockEl.classList.toggle('hide', m!=='editor');
   pvbarEl.classList.toggle('hide', m!=='preview');
   sideEl.classList.remove('open');
-  if(m==='gallery') renderGallery();
-  if((m==='editor' || m==='preview') && productRoot.children.length===0 && products[0]){
+
+  // ✅ إيقاف مصغرات المعرض عند مغادرته — الحل الأساسي للشاشة البيضاء
+  if(prev === 'gallery' && m !== 'gallery'){
+    stopAllThumbs();
+  }
+
+  if(m === 'gallery'){
+    renderGallery();
+    gizmo.attach(null);
+    selected = null;
+  }
+
+  if((m === 'editor' || m === 'preview') && productRoot.children.length === 0 && products[0]){
     loadProduct(products[0]);
   }
-  if(m==='preview') renderPreviewBar();
-  if(m==='editor') select(null);
+
+  if(m === 'editor'){
+    // Gizmo يظهر فقط عند التحديد في المحرر
+    select(null);
+  }
+
+  if(m === 'preview'){
+    // 🚫 إخفاء Gizmo في المعاينة + منع التحديد
+    select(null);
+    gizmo.attach(null);
+    renderPreviewBar();
+  }
 }
 
-/* ---------- Load product ---------- */
+/* ============ Load product ============ */
 function loadProduct(p){
   activeProduct = p;
   while(productRoot.children.length) productRoot.remove(productRoot.children[0]);
@@ -122,13 +171,9 @@ function openProductFromCard(p, view){
   document.querySelector('.modes button[data-mode="'+view+'"]')?.click();
 }
 
-/* ---------- Gallery ---------- */
-let thumbRenderers = [];
+/* ============ Gallery ============ */
 function renderGallery(){
-  thumbRenderers.forEach(r=>{
-    try{ r.dispose(); r.forceContextLoss(); r.domElement.remove(); }catch(e){}
-  });
-  thumbRenderers = [];
+  stopAllThumbs();
   galleryEl.innerHTML = '';
   products.forEach(p => {
     const el = document.createElement('div');
@@ -147,7 +192,9 @@ function renderGallery(){
     el.querySelector('.ed').onclick = ()=> openProductFromCard(p, 'editor');
     galleryEl.appendChild(el);
     const thumb = el.querySelector('.thumb');
-    setTimeout(()=>renderThumb(thumb, p), 40);
+    setTimeout(()=>{
+      if(mode === 'gallery') renderThumb(thumb, p);
+    }, 60);
   });
 }
 
@@ -157,6 +204,7 @@ function renderThumb(container, p){
   r.setSize(w, h); r.setPixelRatio(1);
   container.appendChild(r.domElement);
   thumbRenderers.push(r);
+
   const sc = new THREE.Scene();
   sc.add(new THREE.HemisphereLight(0xffffff, 0x333344, 1.0));
   const dl = new THREE.DirectionalLight(0xffffff, 1.2);
@@ -168,17 +216,19 @@ function renderThumb(container, p){
   const center = box.getCenter(new THREE.Vector3());
   const c = new THREE.PerspectiveCamera(45, w/h, 0.1, 100);
   let t = Math.random()*Math.PI*2;
+
   (function loop(){
-    if(!container.isConnected) return;
+    if(!container.isConnected || mode !== 'gallery') return;
     t += 0.006;
     c.position.set(center.x+Math.cos(t)*size*0.9, center.y+size*0.55, center.z+Math.sin(t)*size*1.05);
     c.lookAt(center);
-    r.render(sc, c);
-    requestAnimationFrame(loop);
+    try{ r.render(sc, c); }catch(e){ return; }
+    const id = requestAnimationFrame(loop);
+    thumbLoops.push(id);
   })();
 }
 
-/* ---------- Preview bar ---------- */
+/* ============ Preview bar ============ */
 function renderPreviewBar(){
   pvbarEl.innerHTML = '';
   const parts = [];
@@ -192,9 +242,11 @@ function renderPreviewBar(){
     pvbarEl.appendChild(b);
     return;
   }
-  parts.forEach((part, i) => {
+  let doorN = 0, drawerN = 0;
+  parts.forEach(part => {
     const btn = document.createElement('button');
-    btn.textContent = part.userData.kind === 'door' ? ('🚪 باب '+(i+1)) : ('🗄️ درج '+(i+1));
+    if(part.userData.kind === 'door'){ doorN++; btn.textContent = '🚪 باب '+doorN; }
+    else { drawerN++; btn.textContent = '🗄️ درج '+drawerN; }
     btn.onclick = ()=>{
       const u = part.userData;
       u.open = u.open ? 0 : 1;
@@ -218,11 +270,12 @@ function animateParts(dt){
   });
 }
 
-/* ---------- Pick / Select ---------- */
+/* ============ Pick / Select ============ */
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
 
 function pick(x, y){
+  if(mode !== 'editor') return;   // منع التحديد في المعاينة والمعرض
   const r = renderer.domElement.getBoundingClientRect();
   pointer.x = ((x - r.left)/r.width)*2 - 1;
   pointer.y = -((y - r.top)/r.height)*2 + 1;
@@ -238,14 +291,15 @@ function pick(x, y){
 
 function select(obj){
   selected = obj;
-  gizmo.attach(obj);
+  gizmo.attach(mode === 'editor' ? obj : null);
   renderProps(obj);
   if(!obj) sideEl.classList.remove('open');
 }
 
-/* ---------- Tap / Double-tap ---------- */
+/* ============ Tap / Double-tap ============ */
 let lastTapTime = 0, lastTapX = 0, lastTapY = 0;
 renderer.domElement.addEventListener('pointerdown', e => {
+  if(mode !== 'editor') return;
   if(gizmo.isDragging()) return;
   const t = e.touches ? e.touches[0] : e;
   const now = Date.now();
@@ -265,7 +319,7 @@ renderer.domElement.addEventListener('pointerdown', e => {
   window.addEventListener('pointerup', up);
 });
 
-/* ---------- Dock ---------- */
+/* ============ Dock ============ */
 function toggleDD(el){
   document.querySelectorAll('.dd').forEach(d=>{ if(d!==el) d.classList.remove('open'); });
   el.classList.toggle('open');
@@ -332,7 +386,7 @@ document.querySelectorAll('#ddTools .row').forEach(r=>{
   };
 });
 
-/* ---------- Side panel ---------- */
+/* ============ Side panel ============ */
 document.getElementById('btnProps').onclick = ()=> sideEl.classList.toggle('open');
 document.getElementById('closeSide').onclick = ()=> sideEl.classList.remove('open');
 document.getElementById('delSel').onclick = ()=>{ if(selected){ selected.remove(); select(null);} };
@@ -369,13 +423,13 @@ function addSlider(label, val, min, max, on){
   propsEl.appendChild(d);
 }
 
-/* ---------- Save ---------- */
+/* ============ Save ============ */
 document.getElementById('btnSave').onclick = ()=>{ persist(); toast('تم الحفظ ✓'); };
 function persist(){
   try{ localStorage.setItem('najjar_products', JSON.stringify(products)); }catch(e){}
 }
 
-/* ---------- Toast ---------- */
+/* ============ Toast ============ */
 let toastT;
 function toast(msg){
   const t = document.getElementById('toast');
@@ -384,24 +438,25 @@ function toast(msg){
   toastT = setTimeout(()=>t.classList.remove('show'), 1600);
 }
 
-/* ---------- Resize ---------- */
+/* ============ Resize ============ */
 addEventListener('resize', ()=>{
   camera.aspect = innerWidth/innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
 });
 
-/* ---------- Loop ---------- */
+/* ============ Loop ============ */
 let last = performance.now();
 function loop(now){
   const dt = Math.min(0.05, (now-last)/1000); last = now;
   controls.update();
-  gizmo.update();
+  if(mode === 'editor') gizmo.update();
+  else gizmo.root.visible = false;
   if(mode === 'preview') animateParts(dt);
   renderer.render(scene, camera);
   requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);
 
-/* ---------- Boot ---------- */
+/* ============ Boot ============ */
 setMode('gallery');
