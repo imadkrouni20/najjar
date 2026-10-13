@@ -175,8 +175,8 @@ function renderThumb(container, p){
   let t = Math.random()*Math.PI*2;
   (function loop(){
     if(!container.isConnected) return;
-    t += 0.008;
-    c.position.set(center.x+Math.cos(t)*size, center.y+size*0.3, center.z+Math.sin(t)*size);
+    t += 0.006;
+    c.position.set(center.x+Math.cos(t)*size*0.9, center.y+size*0.55, center.z+Math.sin(t)*size*1.05);
     c.lookAt(center);
     r.render(sc, c);
     requestAnimationFrame(loop);
