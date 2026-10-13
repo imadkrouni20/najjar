@@ -49,6 +49,17 @@ canvas{display:block;touch-action:none}
 .toast.show{opacity:1;transform:translateX(50%) translateY(0)}
 .hide{display:none!important}
 .gallery{align-content:start;grid-auto-rows:min-content}.card{height:auto;min-height:0}.card .name,.card .sub{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;display:block}.card .actions{padding:8px 10px 10px}.card .actions button{padding:10px 6px;font-size:11px}</style>
+
+<style>/* FIX2 */
+.card > *{flex-shrink:0 !important;min-height:0 !important}
+.card{min-height:232px !important;height:auto !important;overflow:hidden !important}
+.card .thumb{flex:0 0 110px !important;height:110px !important}
+.card .meta{flex:0 0 auto !important;padding:10px 12px !important}
+.card .actions{flex:0 0 48px !important;height:48px !important;padding:8px 10px 10px !important;box-sizing:border-box !important;display:flex !important;gap:6px !important}
+.card .actions button{padding:0 !important;height:100% !important;line-height:1 !important;display:grid !important;place-items:center !important}
+.card .name,.card .sub{white-space:nowrap !important;overflow:hidden !important;text-overflow:ellipsis !important;display:block !important;max-width:100% !important}
+.gallery{grid-auto-rows:min-content !important;align-content:start !important}
+</style>
 </head>
 <body>
 <div id="app">
