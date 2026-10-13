@@ -12,20 +12,23 @@ export class Gizmo {
     this._bind();
   }
   _mat(hex){ return new THREE.MeshBasicMaterial({color:hex,depthTest:false,transparent:true,opacity:.95}); }
+
+  /* سهم أصغر (0.45 بدل 0.6 في الطول) */
   _arrow(dir,color){
     const g = new THREE.Group();
-    const cyl = new THREE.Mesh(new THREE.CylinderGeometry(0.01,0.01,0.6,10), this._mat(color));
-    cyl.position.y = 0.3;
-    const tip = new THREE.Mesh(new THREE.ConeGeometry(0.03,0.12,12), this._mat(color));
-    tip.position.y = 0.66;
+    const cyl = new THREE.Mesh(new THREE.CylinderGeometry(0.008,0.008,0.42,10), this._mat(color));
+    cyl.position.y = 0.21;
+    const tip = new THREE.Mesh(new THREE.ConeGeometry(0.024,0.10,12), this._mat(color));
+    tip.position.y = 0.47;
     g.add(cyl,tip);
     if(dir==='x') g.rotation.z = -Math.PI/2;
-    if(dir==='z') g.rotation.x = Math.PI/2;
+    if(dir==='z') g.rotation.x =  Math.PI/2;
     g.traverse(o=>{ o.userData.axis=dir; o.userData.kind='axis'; });
     return g;
   }
+  /* دائرة دوران أصغر (0.48 بدل 0.65) */
   _ring(axis,color){
-    const geo = new THREE.TorusGeometry(0.65,0.012,8,48);
+    const geo = new THREE.TorusGeometry(0.48, 0.010, 8, 48);
     const mesh = new THREE.Mesh(geo, this._mat(color));
     if(axis==='x') mesh.rotation.y = Math.PI/2;
     if(axis==='y') mesh.rotation.x = Math.PI/2;
@@ -33,7 +36,7 @@ export class Gizmo {
     return mesh;
   }
   _center(){
-    const s = new THREE.Mesh(new THREE.SphereGeometry(0.05,16,16), this._mat(0xffffff));
+    const s = new THREE.Mesh(new THREE.SphereGeometry(0.04,16,16), this._mat(0xffffff));
     s.userData.kind = 'center';
     return s;
   }
@@ -61,20 +64,22 @@ export class Gizmo {
     const c = box.getCenter(new THREE.Vector3());
     this.root.position.copy(c);
     const dist = this.camera.position.distanceTo(c);
-    this.root.scale.setScalar(dist * 0.22);
+    /* حجم أصغر: 0.15 بدل 0.22 */
+    this.root.scale.setScalar(dist * 0.15);
   }
   _bind(){
-    const p = {x:0,y:0};
     const onDown = e => {
       if(!this.target) return;
       const t = e.touches? e.touches[0] : e;
-      p.x = t.clientX; p.y = t.clientY;
       const hit = this._pick(t.clientX, t.clientY);
       if(hit){
         this.dragging = {
-          hit, start:{x:p.x,y:p.y},
-          startPos:this.target.position.clone(),
-          startRot:this.target.rotation.clone()
+          hit,
+          startX: t.clientX, startY: t.clientY,
+          startPos: this.target.position.clone(),
+          startRot: this.target.rotation.clone(),
+          /* نحتفظ بمتجه المحور بإحداثيات عالمية وقت الضغط */
+          axisWorldDir: this._axisWorldDir(hit.userData.axis)
         };
         this.dom.style.cursor = 'grabbing';
         e.preventDefault(); e.stopPropagation();
@@ -83,30 +88,50 @@ export class Gizmo {
     const onMove = e => {
       if(!this.dragging) return;
       const t = e.touches? e.touches[0] : e;
-      const dx = t.clientX - this.dragging.start.x;
-      const dy = t.clientY - this.dragging.start.y;
-      const factor = 0.002 * this.camera.position.distanceTo(this.root.position);
+      const dx = t.clientX - this.dragging.startX;
+      const dy = t.clientY - this.dragging.startY;
       const axis = this.dragging.hit.userData.axis;
       const kind = this.dragging.hit.userData.kind;
-      if(kind==='axis' && this.mode==='translate'){
-        const delta = new THREE.Vector3();
-        if(axis==='x') delta.x = -dx * factor;
-        if(axis==='y') delta.y = dy * factor;
-        if(axis==='z') delta.z = -dx * factor;
+
+      if(kind === 'axis' && this.mode === 'translate'){
+        /* ✅ الطريقة الصحيحة: نُسقط متجه المحور على الشاشة، ثم نأخذ مركّبة السحب عليه */
+        const worldDir = this.dragging.axisWorldDir.clone();
+        const wp = this.root.position.clone();
+        const s0 = wp.clone().project(this.camera);
+        const s1 = wp.clone().add(worldDir).project(this.camera);
+        const rect = this.dom.getBoundingClientRect();
+        const ax = (s1.x - s0.x) * rect.width  / 2;
+        const ay = -(s1.y - s0.y) * rect.height / 2;
+        const len2 = ax*ax + ay*ay;
+        if(len2 < 0.0001) return;
+        const proj = (dx * ax + dy * ay) / len2;
+        const delta = worldDir.multiplyScalar(proj);
         this.target.position.copy(this.dragging.startPos).add(delta);
-      } else if(kind==='ring' || this.mode==='rotate'){
-        const d = (dx + dy) * 0.008;
-        if(axis==='x') this.target.rotation.x = this.dragging.startRot.x + d;
-        if(axis==='y') this.target.rotation.y = this.dragging.startRot.y + d;
-        if(axis==='z') this.target.rotation.z = this.dragging.startRot.z + d;
+
+      } else if(kind === 'ring' || this.mode === 'rotate'){
+        /* الدوران: نستخدم محصلة dx+dy مع اتجاه ثابت يُحسّ حسب المحور */
+        const d = (dx + dy) * 0.010;
+        const sign = (axis === 'y') ? -1 : 1;
+        if(axis==='x') this.target.rotation.x = this.dragging.startRot.x + d*sign;
+        if(axis==='y') this.target.rotation.y = this.dragging.startRot.y + d*sign;
+        if(axis==='z') this.target.rotation.z = this.dragging.startRot.z + d*sign;
       }
       this.onChange && this.onChange();
       e.preventDefault(); e.stopPropagation();
     };
     const onUp = () => { this.dragging = null; this.dom.style.cursor=''; };
+
     this.dom.addEventListener('pointerdown', onDown, {capture:true});
     window.addEventListener('pointermove', onMove, {passive:false});
     window.addEventListener('pointerup', onUp);
+  }
+  _axisWorldDir(axis){
+    const v = new THREE.Vector3(0,0,0);
+    if(axis === 'x') v.set(1,0,0);
+    if(axis === 'y') v.set(0,1,0);
+    if(axis === 'z') v.set(0,0,1);
+    /* نحوّل اتجاه المحور إلى فضاء العالم */
+    return v.applyQuaternion(this.root.quaternion).normalize();
   }
   _pick(x, y){
     const r = this.dom.getBoundingClientRect();
