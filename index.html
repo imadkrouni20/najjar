@@ -8,70 +8,69 @@
 :root{--bg:#0e1116;--bg2:#151a22;--panel:#1b212b;--line:#28303c;--txt:#e8edf5;--mut:#8a93a3;--acc:#ffb545;--acc2:#4ea8ff}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--txt);font-family:-apple-system,"Segoe UI",Tahoma,system-ui,sans-serif;user-select:none}
-#app{position:fixed;inset:0}
+#app{position:fixed;top:0;left:0;right:0;bottom:0;overflow:hidden}
 canvas{display:block;touch-action:none}
-.topbar{position:absolute;top:0;inset-inline:0;height:52px;display:flex;align-items:center;gap:8px;padding:0 10px;background:linear-gradient(180deg,rgba(14,17,22,.95),rgba(14,17,22,.6));backdrop-filter:blur(8px);z-index:20;border-bottom:1px solid var(--line)}
+
+.topbar{position:absolute;top:0;left:0;right:0;height:52px;display:flex;align-items:center;gap:8px;padding:0 10px;background:linear-gradient(180deg,rgba(14,17,22,.95),rgba(14,17,22,.6));backdrop-filter:blur(8px);z-index:20;border-bottom:1px solid var(--line)}
 .logo{font-weight:800;font-size:16px;color:var(--acc)}
-.modes{display:flex;gap:4px;margin-inline-start:auto;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:3px}
-.modes button{background:transparent;border:0;color:var(--mut);font-weight:700;padding:7px 12px;border-radius:9px;font-size:12px}
+.modes{display:flex;gap:4px;margin-right:auto;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:3px}
+.modes button{background:transparent;border:0;color:var(--mut);font-weight:700;padding:7px 12px;border-radius:9px;font-size:12px;cursor:pointer}
 .modes button.on{background:var(--acc);color:#111}
-.dock{position:absolute;bottom:16px;inset-inline-start:50%;transform:translateX(50%);display:flex;gap:10px;z-index:20}
-.dock .fbtn{width:56px;height:56px;border-radius:18px;background:var(--panel);border:1px solid var(--line);color:var(--txt);font-size:22px;display:grid;place-items:center;box-shadow:0 10px 26px rgba(0,0,0,.5);position:relative}
+
+.dock{position:absolute;bottom:16px;left:50%;transform:translateX(-50%);display:flex;gap:10px;z-index:20}
+.dock .fbtn{width:56px;height:56px;border-radius:18px;background:var(--panel);border:1px solid var(--line);color:var(--txt);font-size:22px;display:grid;place-items:center;box-shadow:0 10px 26px rgba(0,0,0,.5);position:relative;cursor:pointer}
 .dock .fbtn:active{transform:scale(.94)}
-.dd{position:absolute;bottom:70px;inset-inline-start:50%;transform:translateX(50%) translateY(8px);background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:8px;display:grid;gap:6px;min-width:200px;opacity:0;pointer-events:none;transition:.18s;box-shadow:0 14px 40px rgba(0,0,0,.55);z-index:30}
-.dd.open{opacity:1;pointer-events:auto;transform:translateX(50%) translateY(0)}
-.dd .row{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:10px;background:var(--bg2);font-size:13px;font-weight:600}
+
+.dd{position:absolute;bottom:70px;left:50%;transform:translateX(-50%) translateY(8px);background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:8px;display:grid;gap:6px;min-width:200px;opacity:0;pointer-events:none;transition:.18s;box-shadow:0 14px 40px rgba(0,0,0,.55);z-index:30}
+.dd.open{opacity:1;pointer-events:auto;transform:translateX(-50%) translateY(0)}
+.dd .row{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:10px;background:var(--bg2);font-size:13px;font-weight:600;cursor:pointer}
 .dd .row:active{background:#242c38}
 .dd .row .ic{font-size:18px;width:22px;text-align:center}
-.side{position:absolute;top:52px;bottom:0;inset-inline-end:0;width:min(320px,86vw);background:var(--panel);border-inline-start:1px solid var(--line);z-index:25;transform:translateX(100%);transition:.25s;overflow-y:auto;padding:14px}
-.side.open{transform:none}
+
+/* === لوحة جانبية مخفية تمامًا على اليمين === */
+.side{
+  position:absolute;
+  top:52px;bottom:0;right:0;
+  width:min(320px,86vw);
+  background:var(--panel);
+  border-left:1px solid var(--line);
+  z-index:25;
+  transform:translateX(110%);
+  transition:transform .25s ease;
+  overflow-y:auto;
+  padding:14px;
+  box-shadow:-12px 0 32px rgba(0,0,0,.55);
+  pointer-events:none;
+}
+.side.open{transform:translateX(0);pointer-events:auto}
 .side h3{margin:6px 0 10px;font-size:13px;color:var(--mut);text-transform:uppercase;letter-spacing:1px}
 .prop{margin-bottom:12px}
 .prop label{display:flex;justify-content:space-between;font-size:12px;color:var(--mut);margin-bottom:5px}
 .prop input[type=range]{width:100%;accent-color:var(--acc)}
 .prop .val{color:var(--acc);font-weight:700}
-.btn{width:100%;padding:11px;border-radius:11px;border:1px solid var(--line);background:var(--bg2);color:var(--txt);font-weight:700;font-size:13px;margin-bottom:8px}
+.btn{width:100%;padding:11px;border-radius:11px;border:1px solid var(--line);background:var(--bg2);color:var(--txt);font-weight:700;font-size:13px;margin-bottom:8px;cursor:pointer}
 .btn.danger{background:#3a1d1d;border-color:#5a2a2a;color:#ffb3b3}
-.gallery{position:absolute;inset:52px 0 0 0;overflow-y:auto;padding:14px;display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;z-index:15;background:var(--bg)}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;overflow:hidden;display:flex;flex-direction:column}
-.card .thumb{height:110px;background:radial-gradient(circle at 30% 20%,#2a3340,#141922);position:relative}
+
+.gallery{position:absolute;top:52px;left:0;right:0;bottom:0;overflow-y:auto;padding:14px;display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;z-index:15;background:var(--bg);align-content:start;grid-auto-rows:min-content}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;overflow:hidden;display:flex;flex-direction:column;min-height:232px}
+.card>*{flex-shrink:0}
+.card .thumb{flex:0 0 110px;height:110px;background:radial-gradient(circle at 30% 20%,#2a3340,#141922);position:relative}
 .card .thumb canvas{width:100%;height:100%;display:block}
 .card .meta{padding:10px 12px;display:flex;flex-direction:column;gap:4px}
-.card .name{font-weight:800;font-size:13px}
-.card .sub{font-size:11px;color:var(--mut)}
-.card .actions{display:flex;gap:6px;padding:0 10px 10px}
-.card .actions button{flex:1;padding:8px;border-radius:9px;border:1px solid var(--line);background:var(--bg2);color:var(--txt);font-weight:700;font-size:11px}
+.card .name{font-weight:800;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card .sub{font-size:11px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card .actions{display:flex;gap:6px;padding:8px 10px 10px;height:48px;flex:0 0 48px}
+.card .actions button{flex:1;padding:0;border-radius:9px;border:1px solid var(--line);background:var(--bg2);color:var(--txt);font-weight:700;font-size:11px;display:grid;place-items:center;cursor:pointer}
 .card .actions .go{background:var(--acc);color:#111;border-color:var(--acc)}
-.pvbar{position:absolute;bottom:16px;inset-inline-start:50%;transform:translateX(50%);display:flex;gap:8px;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:8px;z-index:20;max-width:92vw;overflow-x:auto}
-.pvbar button{background:var(--bg2);border:1px solid var(--line);color:var(--txt);padding:9px 12px;border-radius:10px;font-weight:700;font-size:12px;white-space:nowrap}
+
+.pvbar{position:absolute;bottom:16px;left:50%;transform:translateX(-50%);display:flex;gap:8px;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:8px;z-index:20;max-width:92vw;overflow-x:auto}
+.pvbar button{background:var(--bg2);border:1px solid var(--line);color:var(--txt);padding:9px 12px;border-radius:10px;font-weight:700;font-size:12px;white-space:nowrap;cursor:pointer}
 .pvbar button.on{background:var(--acc2);color:#111;border-color:var(--acc2)}
-.toast{position:absolute;top:66px;inset-inline-start:50%;transform:translateX(50%) translateY(-12px);background:var(--panel);border:1px solid var(--line);padding:9px 14px;border-radius:11px;font-size:12px;font-weight:700;opacity:0;transition:.25s;z-index:60;pointer-events:none}
-.toast.show{opacity:1;transform:translateX(50%) translateY(0)}
+
+.toast{position:absolute;top:66px;left:50%;transform:translateX(-50%) translateY(-12px);background:var(--panel);border:1px solid var(--line);padding:9px 14px;border-radius:11px;font-size:12px;font-weight:700;opacity:0;transition:.25s;z-index:60;pointer-events:none}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
 .hide{display:none!important}
-.gallery{align-content:start;grid-auto-rows:min-content}.card{height:auto;min-height:0}.card .name,.card .sub{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;display:block}.card .actions{padding:8px 10px 10px}.card .actions button{padding:10px 6px;font-size:11px}</style>
-
-<style>/* FIX2 */
-.card > *{flex-shrink:0 !important;min-height:0 !important}
-.card{min-height:232px !important;height:auto !important;overflow:hidden !important}
-.card .thumb{flex:0 0 110px !important;height:110px !important}
-.card .meta{flex:0 0 auto !important;padding:10px 12px !important}
-.card .actions{flex:0 0 48px !important;height:48px !important;padding:8px 10px 10px !important;box-sizing:border-box !important;display:flex !important;gap:6px !important}
-.card .actions button{padding:0 !important;height:100% !important;line-height:1 !important;display:grid !important;place-items:center !important}
-.card .name,.card .sub{white-space:nowrap !important;overflow:hidden !important;text-overflow:ellipsis !important;display:block !important;max-width:100% !important}
-.gallery{grid-auto-rows:min-content !important;align-content:start !important}
-</style>
-
-<style>/* FIX4-CSS */
-.side{
-  inset-inline-end:auto !important;
-  right:0 !important;
-  left:auto !important;
-  border-inline-start:none !important;
-  border-left:1px solid var(--line) !important;
-  transform:translateX(110%) !important;
-  box-shadow:-12px 0 32px rgba(0,0,0,.55) !important;
-}
-.side.open{transform:translateX(0) !important}
 </style>
 </head>
 <body>
