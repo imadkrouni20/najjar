@@ -4,7 +4,7 @@ import { BUILDERS, LABELS } from './models.js';
 import { Gizmo } from './gizmo.js';
 import { getMaterial } from './materials.js';
 
-/* ============ Renderer ============ */
+/* ============ Renderer (سياق واحد فقط) ============ */
 const app = document.getElementById('app');
 const renderer = new THREE.WebGLRenderer({ antialias:true, powerPreference:'high-performance' });
 renderer.setPixelRatio(Math.min(1.5, devicePixelRatio));
@@ -13,15 +13,13 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 app.appendChild(renderer.domElement);
 
-/* معالجة فقدان السياق (يمنع الشاشة البيضاء) */
 renderer.domElement.addEventListener('webglcontextlost', e => {
   e.preventDefault();
-  console.warn('WebGL context lost');
-}, false);
+  console.warn('WebGL lost');
+});
 renderer.domElement.addEventListener('webglcontextrestored', () => {
-  console.warn('WebGL context restored');
-  renderer.setSize(innerWidth, innerHeight);
-}, false);
+  console.warn('WebGL restored');
+});
 
 /* ============ Scene ============ */
 const scene = new THREE.Scene();
@@ -88,22 +86,11 @@ function seedProducts(){
   ];
 }
 
-/* ============ Thumbnail manager ============ */
-const thumbRenderers = [];        // كل المصغرات النشطة
-const thumbLoops = [];            // معرفات requestAnimationFrame
-
-function stopAllThumbs(){
-  thumbLoops.forEach(id => cancelAnimationFrame(id));
-  thumbLoops.length = 0;
-  thumbRenderers.forEach(r => {
-    try{
-      r.dispose();
-      r.forceContextLoss();
-      r.domElement.remove();
-    }catch(e){}
-  });
-  thumbRenderers.length = 0;
-}
+/* ============ Icons (بدل WebGL للمصغّرات) ============ */
+const ICONS = {
+  wardrobe:'🚪', kitchen:'🍳', shelf:'📚',
+  table:'🪑', doorUnit:'🚪', window:'🪟'
+};
 
 /* ============ Modes ============ */
 document.querySelectorAll('.modes button').forEach(b=>{
@@ -115,38 +102,30 @@ document.querySelectorAll('.modes button').forEach(b=>{
 });
 
 function setMode(m){
-  const prev = mode;
   mode = m;
   galleryEl.classList.toggle('hide', m!=='gallery');
   dockEl.classList.toggle('hide', m!=='editor');
   pvbarEl.classList.toggle('hide', m!=='preview');
   sideEl.classList.remove('open');
 
-  // ✅ إيقاف مصغرات المعرض عند مغادرته — الحل الأساسي للشاشة البيضاء
-  if(prev === 'gallery' && m !== 'gallery'){
-    stopAllThumbs();
-  }
-
   if(m === 'gallery'){
     renderGallery();
+    select(null);
     gizmo.attach(null);
-    selected = null;
   }
 
   if((m === 'editor' || m === 'preview') && productRoot.children.length === 0 && products[0]){
     loadProduct(products[0]);
   }
 
-  if(m === 'editor'){
-    // Gizmo يظهر فقط عند التحديد في المحرر
-    select(null);
-  }
-
   if(m === 'preview'){
-    // 🚫 إخفاء Gizmo في المعاينة + منع التحديد
     select(null);
     gizmo.attach(null);
     renderPreviewBar();
+  }
+
+  if(m === 'editor'){
+    select(null);
   }
 }
 
@@ -171,9 +150,8 @@ function openProductFromCard(p, view){
   document.querySelector('.modes button[data-mode="'+view+'"]')?.click();
 }
 
-/* ============ Gallery ============ */
+/* ============ Gallery (بدون WebGL) ============ */
 function renderGallery(){
-  stopAllThumbs();
   galleryEl.innerHTML = '';
   products.forEach(p => {
     const el = document.createElement('div');
@@ -192,38 +170,15 @@ function renderGallery(){
     el.querySelector('.ed').onclick = ()=> openProductFromCard(p, 'editor');
     galleryEl.appendChild(el);
     const thumb = el.querySelector('.thumb');
-    setTimeout(()=>{
-      if(mode === 'gallery') renderThumb(thumb, p);
-    }, 60);
+    thumb.style.background = 'linear-gradient(135deg,#1e2632 0%,#0f141b 100%)';
+    thumb.style.display = 'flex';
+    thumb.style.alignItems = 'center';
+    thumb.style.justifyContent = 'center';
+    const ic = document.createElement('div');
+    ic.textContent = ICONS[p.type] || '📦';
+    ic.style.cssText = 'font-size:58px;filter:drop-shadow(0 6px 16px rgba(0,0,0,.6));line-height:1';
+    thumb.appendChild(ic);
   });
-}
-
-/* FIX6 */ function renderThumb(container, p){
-  const w = container.clientWidth || 200, h = 110;
-  const r = new THREE.WebGLRenderer({ antialias:true, alpha:true, preserveDrawingBuffer:true });
-  r.setSize(w, h); r.setPixelRatio(1);
-  const sc = new THREE.Scene();
-  sc.add(new THREE.HemisphereLight(0xffffff, 0x333344, 1.0));
-  const dl = new THREE.DirectionalLight(0xffffff, 1.2);
-  dl.position.set(2,3,2); sc.add(dl);
-  const prod = BUILDERS[p.type](p.params);
-  sc.add(prod);
-  const box = new THREE.Box3().setFromObject(prod);
-  const size = box.getSize(new THREE.Vector3()).length();
-  const center = box.getCenter(new THREE.Vector3());
-  const c = new THREE.PerspectiveCamera(45, w/h, 0.1, 100);
-  c.position.set(center.x+size*0.9, center.y+size*0.55, center.z+size*1.05);
-  c.lookAt(center);
-  r.render(sc, c);
-  // استخرج الصورة كـ Data URL ثم دمّر السياق فورًا
-  const dataUrl = r.domElement.toDataURL('image/png');
-  r.dispose();
-  r.forceContextLoss();
-  // اعرض الصورة بدل canvas
-  const img = document.createElement('img');
-  img.src = dataUrl;
-  img.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block';
-  container.appendChild(img);
 }
 
 /* ============ Preview bar ============ */
@@ -273,7 +228,7 @@ const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
 
 function pick(x, y){
-  if(mode !== 'editor') return;   // منع التحديد في المعاينة والمعرض
+  if(mode !== 'editor') return;
   const r = renderer.domElement.getBoundingClientRect();
   pointer.x = ((x - r.left)/r.width)*2 - 1;
   pointer.y = -((y - r.top)/r.height)*2 + 1;
@@ -289,7 +244,11 @@ function pick(x, y){
 
 function select(obj){
   selected = obj;
-  gizmo.attach(mode === 'editor' ? obj : null);
+  if(mode === 'editor'){
+    gizmo.attach(obj);
+  } else {
+    gizmo.attach(null);
+  }
   renderProps(obj);
   if(!obj) sideEl.classList.remove('open');
 }
@@ -447,11 +406,18 @@ addEventListener('resize', ()=>{
 let last = performance.now();
 function loop(now){
   const dt = Math.min(0.05, (now-last)/1000); last = now;
-  controls.update();
-  if(mode === 'editor') gizmo.update();
-  else gizmo.root.visible = false;
-  if(mode === 'preview') animateParts(dt);
-  renderer.render(scene, camera);
+  try{
+    controls.update();
+    if(mode === 'editor'){
+      gizmo.update();
+    } else {
+      gizmo.root.visible = false;
+    }
+    if(mode === 'preview') animateParts(dt);
+    renderer.render(scene, camera);
+  }catch(err){
+    console.error(err);
+  }
   requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);
