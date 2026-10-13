@@ -1,15 +1,16 @@
 import * as THREE from 'three';
 
 export class Gizmo {
-  constructor(scene, camera, dom, onChange){
-    this.scene=scene; this.camera=camera; this.dom=dom; this.onChange=onChange;
+  constructor(scene, camera, dom, onChange, controls){
+    this.scene=scene; this.camera=camera; this.dom=dom;
+    this.onChange=onChange; this.controls=controls;   // ← مرجع OrbitControls
     this.target=null; this.mode='translate'; this.dragging=null;
     this.root = new THREE.Group();
     this.root.renderOrder = 999;
     scene.add(this.root);
     this.root.visible = false;
     this._build();
-    this.setMode('translate');   // ✅ يبدأ دائمًا بالتحريك — الدوائر مخفية
+    this.setMode('translate');
     this._bind();
   }
   _mat(hex){ return new THREE.MeshBasicMaterial({color:hex,depthTest:false,transparent:true,opacity:.95}); }
@@ -50,17 +51,14 @@ export class Gizmo {
     this.root.add(this.gAxisX,this.gAxisY,this.gAxisZ,this.gRings,this.gCenter);
   }
   attach(obj){ this.target=obj; this.root.visible = !!obj; }
-
   setMode(m){
     this.mode = m;
     const rot = (m === 'rotate');
-    /* ✅ في وضع التحريك: الدوائر مخفية تمامًا */
     this.gAxisX.visible = !rot;
     this.gAxisY.visible = !rot;
     this.gAxisZ.visible = !rot;
     this.gRings.visible = rot;
   }
-
   update(){
     if(!this.target){ this.root.visible=false; return; }
     this.root.visible = true;
@@ -68,9 +66,8 @@ export class Gizmo {
     const c = box.getCenter(new THREE.Vector3());
     this.root.position.copy(c);
     const dist = this.camera.position.distanceTo(c);
-    this.root.scale.setScalar(dist * 0.13);   // ✅ أصغر
+    this.root.scale.setScalar(dist * 0.13);
   }
-
   _bind(){
     const onDown = e => {
       if(!this.target) return;
@@ -78,10 +75,11 @@ export class Gizmo {
       const hit = this._pick(t.clientX, t.clientY);
       if(!hit) return;
       const kind = hit.userData.kind;
-
-      /* ✅ منع تفعيل أي وضع غير مسموح */
       if(this.mode === 'translate' && kind !== 'axis') return;
       if(this.mode === 'rotate'    && kind !== 'ring') return;
+
+      /* 🚫 أوقف OrbitControls تمامًا — لن تدور الكاميرا */
+      if(this.controls) this.controls.enabled = false;
 
       this.dragging = {
         hit,
@@ -91,7 +89,11 @@ export class Gizmo {
         axisWorldDir: this._axisWorldDir(hit.userData.axis)
       };
       this.dom.style.cursor = 'grabbing';
-      e.preventDefault(); e.stopPropagation();
+
+      /* ✅ أوقف الحدث تمامًا — لن يصل إلى OrbitControls */
+      e.preventDefault();
+      e.stopPropagation();
+      if(e.stopImmediatePropagation) e.stopImmediatePropagation();
     };
 
     const onMove = e => {
@@ -102,7 +104,7 @@ export class Gizmo {
       const axis = this.dragging.hit.userData.axis;
       const kind = this.dragging.hit.userData.kind;
 
-      /* ✅ التحريك فقط — لا دوران على الإطلاق */
+      /* ✅ التحريك فقط */
       if(this.mode === 'translate' && kind === 'axis'){
         const worldDir = this.dragging.axisWorldDir.clone();
         const wp = this.root.position.clone();
@@ -117,8 +119,7 @@ export class Gizmo {
         const delta = worldDir.multiplyScalar(proj);
         this.target.position.copy(this.dragging.startPos).add(delta);
       }
-
-      /* ✅ الدوران فقط — لا تحريك على الإطلاق */
+      /* ✅ الدوران فقط */
       else if(this.mode === 'rotate' && kind === 'ring'){
         const d = (dx + dy) * 0.010;
         if(axis==='x') this.target.rotation.x = this.dragging.startRot.x + d;
@@ -127,16 +128,29 @@ export class Gizmo {
       }
 
       this.onChange && this.onChange();
-      e.preventDefault(); e.stopPropagation();
+      e.preventDefault();
+      e.stopPropagation();
+      if(e.stopImmediatePropagation) e.stopImmediatePropagation();
     };
 
-    const onUp = () => { this.dragging = null; this.dom.style.cursor=''; };
+    const onUp = () => {
+      if(this.dragging){
+        this.dragging = null;
+        this.dom.style.cursor = '';
+        /* ✅ أعد تفعيل الكاميرا */
+        if(this.controls) this.controls.enabled = true;
+      }
+    };
 
-    this.dom.addEventListener('pointerdown', onDown, {capture:true});
-    window.addEventListener('pointermove', onMove, {passive:false});
+    /* نضيف في طور Capture حتى نسبق OrbitControls دائمًا */
+    this.dom.addEventListener('pointerdown', onDown, {capture:true, passive:false});
+    this.dom.addEventListener('touchstart', onDown, {capture:true, passive:false});
+    window.addEventListener('pointermove', onMove, {capture:true, passive:false});
+    window.addEventListener('touchmove', onMove, {capture:true, passive:false});
     window.addEventListener('pointerup', onUp);
+    window.addEventListener('touchend', onUp);
+    window.addEventListener('touchcancel', onUp);
   }
-
   _axisWorldDir(axis){
     const v = new THREE.Vector3(0,0,0);
     if(axis === 'x') v.set(1,0,0);
@@ -144,13 +158,11 @@ export class Gizmo {
     if(axis === 'z') v.set(0,0,1);
     return v.applyQuaternion(this.root.quaternion).normalize();
   }
-
   _pick(x, y){
     const r = this.dom.getBoundingClientRect();
     const ndc = new THREE.Vector2(((x-r.left)/r.width)*2-1, -((y-r.top)/r.height)*2+1);
     const rc = new THREE.Raycaster();
     rc.setFromCamera(ndc, this.camera);
-    /* ✅ نفحص فقط العناصر الظاهرة حسب الوضع */
     const list = (this.mode === 'rotate')
       ? [this.gRings]
       : [this.gAxisX, this.gAxisY, this.gAxisZ];

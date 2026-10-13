@@ -57,7 +57,7 @@ const productRoot = new THREE.Group();
 scene.add(productRoot);
 
 /* ============ Gizmo ============ */
-const gizmo = new Gizmo(scene, camera, renderer.domElement, ()=>{});
+const gizmo = new Gizmo(scene, camera, renderer.domElement, ()=>{}, controls);
 
 /* ============ DOM ============ */
 const galleryEl = document.getElementById('gallery');
