@@ -125,6 +125,9 @@ function setMode(m){
   pvbarEl.classList.toggle('hide', m!=='preview');
   sideEl.classList.remove('open');
   if(m==='gallery') renderGallery();
+  if((m==='editor' || m==='preview') && productRoot.children.length===0 && products[0]){
+    openProduct(products[0], m, true);
+  }
   if(m==='preview') renderPreviewBar();
   if(m==='editor') select(null);
 }
@@ -207,7 +210,8 @@ function renderThumb(container, p){
 
 let activeProduct = null;
 
-function openProduct(p, view){
+/* FIX4-LOGIC */
+function openProduct(p, view, silent){
   activeProduct = p;
   while(productRoot.children.length){
     const c = productRoot.children[0];
@@ -223,7 +227,9 @@ function openProduct(p, view){
   camera.position.set(dist, center.y + size.y*0.35, dist);
   controls.target.copy(center);
   controls.update();
-  document.querySelector(`.modes button[data-mode="${view}"]`)?.click();
+  if(!silent){
+    document.querySelector(`.modes button[data-mode="${view}"]`)?.click();
+  }
 }
 
 function renderPreviewBar(){
